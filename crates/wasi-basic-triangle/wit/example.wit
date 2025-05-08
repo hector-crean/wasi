@@ -1,0 +1,28 @@
+package example:example;
+
+
+// Imports
+// Definition: Functions or interfaces that the host provides and the guest uses
+// Implementation: Host (browser/runtime) must implement these functions
+// Usage: Guest (your Rust code) calls these functions
+// Example: import wasi:webgpu/webgpu means "my Rust code needs WebGPU functions from the browser"
+
+// Exports
+// Definition: Functions or interfaces that the guest implements and exposes to the host
+// Implementation: Guest (your Rust code) must implement these functions
+// Usage: Host (browser/runtime) can call these functions
+// Example: export markdown-parser means "my Rust code implements markdown parsing functions that JS can call"
+
+// +---------------------+               +---------------------+
+// |                     |     Import    |                     |
+// |     Browser/JS      | ----------->  |   Rust WASM Module  |
+// |     (Host)          |               |   (Guest)           |
+// |                     |     Export    |                     |
+// |                     | <-----------  |                     |
+// +---------------------+               +---------------------+
+
+world example {
+    import wasi:webgpu/webgpu@0.0.1;
+    import wasi:graphics-context/graphics-context@0.0.1;
+    import wasi:surface/surface@0.0.1;
+}

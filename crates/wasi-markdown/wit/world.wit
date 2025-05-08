@@ -1,0 +1,25 @@
+// Define the package and version (optional but good practice)
+package wasi:markdown-parser@0.1.0;
+
+
+
+
+// Define the world for our component
+// A world describes the imports and exports of a WebAssembly component.
+world markdown {
+    // Export the 'parse-markdown' interface
+    export parser;  
+}
+
+
+interface parser {
+    // Basic markdown parsing function
+    parse-markdown: func(input: string) -> string;
+    
+    // Advanced parsing with configuration options
+    parse-markdown-with-config: func(
+        input: string,
+        enable-syntax-highlighting: bool,
+        enable-math: bool
+    ) -> string;
+}

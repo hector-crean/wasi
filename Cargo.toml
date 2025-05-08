@@ -1,0 +1,15 @@
+[workspace]
+members = [
+    "crates/*",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Your Name <your.email@example.com>"]
+description = "A WASI project workspace"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+# Common dependencies can be defined here and then referenced in member crates
+wit-bindgen = { version = "0.42.1" }
