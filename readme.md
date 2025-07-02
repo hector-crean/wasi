@@ -1,342 +1,644 @@
-# WebAssembly System Interface (WASI)
+# Current Situation
 
-## What is WASI?
+The current state of WebAssembly integration often requires extensive JavaScript glue code to bridge the gap between web applications and WebAssembly modules, as illustrated below:
 
-WASI (WebAssembly System Interface) is a modular system interface for WebAssembly. It provides a standardized way for WebAssembly modules to interact with system resources like file systems, network connections, clocks, and random numbers, as well as browser-specific capabilities like graphics and audio.
+![glue-code](/assets/js-glue-code.webp)
 
-## Why WASI Matters for Web Development
+## The Traditional Approach: Figma's Emscripten Integration
 
-### Bridge Between Systems and Browser Programming
+[Figma](https://www.figma.com/blog/how-figma-draws-inspiration-from-the-gaming-world/) provides an excellent example of how traditional WebAssembly integration works using Emscripten to wrap a C++ rendering engine in a React application. This approach represents the "current situation" that the WIT Component Model aims to improve upon.
 
-WASI extends WebAssembly beyond the browser, creating a universal runtime that works consistently across browsers, servers, IoT devices, and more. For web developers, this means:
 
-- **Write Once, Run Anywhere**: Code written for WASI can run in browsers, Node.js, Deno, and standalone WASI runtimes without modification
-- **Language-Agnostic**: Use languages like Rust, C/C++, AssemblyScript, or Go for performance-critical code, while maintaining JavaScript for UI and DOM manipulation
-- **Security by Design**: WASI's capability-based security model provides fine-grained access control, improving on the web security model
 
-### The Component Model: A New Web Architecture
-
-The WebAssembly Component Model builds on WASI to enable truly modular, interoperable components:
-
-- **Language Interoperability**: Components written in different languages can seamlessly communicate
-- **Standardized Interfaces**: WIT (WebAssembly Interface Types) provide clear contracts between components
-- **Composability**: Build applications from plug-and-play components with defined interfaces
-
-### Benefits for Web Applications
-
-- **Performance**: Near-native speed for compute-intensive tasks like image/video processing, data visualization, and simulations
-- **Advanced Capabilities**: Access to high-performance APIs like WebGPU through standardized interfaces
-- **Reduced JavaScript Fatigue**: Use the right tool for each job rather than forcing everything into JavaScript
-- **Smaller Downloads**: Ship optimized binary code that's often smaller than equivalent JavaScript
-- **Battery Efficiency**: More efficient execution means better battery life on mobile devices
-
-### Real-World Use Cases
-
-- **Rich Media Processing**: Video editing, image manipulation, and audio processing
-- **Data Visualization**: Complex data rendering and interactive visualizations
-- **Gaming**: Physics engines, AI, procedural generation
-- **Scientific Computing**: Machine learning, simulations, data analysis
-- **Cryptography**: High-performance encryption and secure computations
-
-## WASI-GFX: Graphics Capabilities for WebAssembly
-
-[WASI-GFX](https://github.com/WebAssembly/wasi-gfx) is a collection of standardized interfaces for graphics programming in WebAssembly, enabling powerful visual applications across platforms. It consists of multiple related packages:
-
-- **wasi:webgpu**: Access to GPU hardware acceleration via the WebGPU standard
-- **wasi:frame-buffer**: CPU-based rendering for environments without GPU support
-- **wasi:surface**: Canvas-like surface management for display and input events
-- **wasi:graphics-context**: Connection layer between graphics APIs and surfaces
-
-### How WASI-GFX Works: Host and Guest Model
+### How Figma's Architecture Works
 
 ```mermaid
 graph TB
-    %% Define main containers
-    subgraph "Host Environment (Browser)"
-        JS["JavaScript Runtime"]
-        DOM["DOM/Canvas"]
-        WASI["WASI Runtime"]
-        
-        %% Host-provided graphics functions
-        subgraph "Host-Provided Graphics APIs"
-            H1["wasi:surface API"]
-            H2["wasi:webgpu API"]
-            H3["GPU Hardware Access"]
-            H4["Canvas Context"]
-        end
+    subgraph "React Application Layer"
+        RC["React Components"]
+        UI["UI State Management"]
+        ES["Event System"]
     end
     
-    subgraph "Guest (Rust WebAssembly Component)"
-        WIT["WIT Interface Definitions"]
-        
-        subgraph "Guest Graphics Implementation"
-            G1["Triangle Renderer"]
-            G2["Shader Management"]
-            G3["Frame Animation"]
-        end
-        
-        subgraph "Guest-Exported Functions"
-            E1["render_frame()"]
-            E2["init_graphics()"]
-            E3["handle_input()"]
-        end
+    subgraph "JavaScript Glue Layer"
+        GL["Emscripten Generated Glue Code"]
+        AB["ArrayBuffer Management"]
+        FC["Function Call Marshalling"]
+        EM["Event Message Passing"]
     end
     
-    %% Define relationships and data flow
-    JS -- "1. Instantiates" --> WASI
-    WASI -- "2. Loads" --> WIT
+    subgraph "WebAssembly Module"
+        CE["C++ Rendering Engine"]
+        GM["Graphics Manager"]
+        SC["Scene Compositor"]
+        VR["Vector Renderer"]
+    end
     
-    %% Host → Guest function calls
-    H1 -. "3. Imported by Guest\n(via WIT definition)" .-> G1
-    H2 -. "Imported by Guest" .-> G2
-    H1 -. "Events (resize, pointer)" .-> G3
+    subgraph "Browser APIs"
+        CV["Canvas/WebGL"]
+        WW["Web Workers"]
+        IDB["IndexedDB"]
+    end
     
-    %% Guest implementation calls host functions
-    G1 -- "4. Calls surface API" --> H1
-    G2 -- "Calls WebGPU API" --> H2
-    H2 -- "Accesses" --> H3
-    H1 -- "Renders to" --> H4
+    RC --> GL
+    UI --> GL
+    ES --> GL
     
-    %% Guest → Host function calls (exports)
-    G1 -- "5. Implements" --> E1
-    G2 -- "Implements" --> E2
-    G3 -- "Implements" --> E3
+    GL --> CE
+    AB --> CE
+    FC --> CE
+    EM --> CE
     
-    %% Host calls guest exports
-    JS -- "6. Calls to\nstart rendering" --> E2
-    JS -- "Calls per frame" --> E1
-    JS -- "Forwards events" --> E3
+    CE --> CV
+    GM --> CV
+    SC --> CV
+    VR --> CV
     
-    %% Host implementation details
-    H4 -- "Updates" --> DOM
+    CE --> WW
+    CE --> IDB
     
-    %% Add descriptions
-    classDef hostFn fill:#f9f,stroke:#333,stroke-width:1px
-    classDef guestFn fill:#bbf,stroke:#333,stroke-width:1px
-    classDef container fill:#efefef,stroke:#999,stroke-width:1px
+    classDef react fill:#61dafb,stroke:#000,color:#000
+    classDef glue fill:#ffd700,stroke:#000,color:#000
+    classDef wasm fill:#654ff0,stroke:#fff,color:#fff
+    classDef browser fill:#ff6b6b,stroke:#fff,color:#fff
     
-    class H1,H2,H3,H4 hostFn
-    class E1,E2,E3 guestFn
-    class JS,DOM,WASI,WIT,G1,G2,G3 container
+    class RC,UI,ES react
+    class GL,AB,FC,EM glue
+    class CE,GM,SC,VR wasm
+    class CV,WW,IDB browser
 ```
 
-## WebGPU Triangle Example with WASI-GFX
+### React Layer Integration
 
-### Definition in WIT
-
-```wit
-// world definition using WASI-GFX interfaces
-world triangle-renderer {
-  import wasi:webgpu/webgpu;
-  import wasi:graphics-context/graphics-context;
-  import wasi:surface/surface;
-
-  export init-renderer;
-  export render-frame;
+```typescript
+// React component that wraps the Figma canvas
+interface FigmaCanvasProps {
+  documentId: string;
+  onSelectionChange: (selection: NodeId[]) => void;
+  onViewportChange: (viewport: Viewport) => void;
 }
 
-// Exported interface for rendering
-interface init-renderer {
-  init: func();
-}
-
-interface render-frame {
-  render: func() -> bool;
+function FigmaCanvas({ documentId, onSelectionChange, onViewportChange }: FigmaCanvasProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const engineRef = useRef<FigmaEngine | null>(null);
+  
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    
+    // Initialize the Emscripten-compiled engine
+    FigmaEngine.create({
+      canvas: canvasRef.current,
+      wasmPath: '/figma-engine.wasm',
+    }).then(engine => {
+      engineRef.current = engine;
+      
+      // Set up event handlers that bridge React and C++
+      engine.onSelectionChange = (nodeIds: number[]) => {
+        onSelectionChange(nodeIds.map(id => ({ id })));
+      };
+      
+      engine.onViewportChange = (x: number, y: number, zoom: number) => {
+        onViewportChange({ x, y, zoom });
+      };
+      
+      // Load the document into the C++ engine
+      engine.loadDocument(documentId);
+    });
+    
+    return () => {
+      engineRef.current?.destroy();
+    };
+  }, [documentId]);
+  
+  // React event handlers that call into C++
+  const handleMouseDown = useCallback((event: MouseEvent) => {
+    if (!engineRef.current) return;
+    
+    const rect = canvasRef.current!.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    
+    // Call into C++ engine via Emscripten glue code
+    engineRef.current.handleMouseDown(x, y, event.button);
+  }, []);
+  
+  return (
+    <canvas
+      ref={canvasRef}
+      onMouseDown={handleMouseDown}
+      style={{ width: '100%', height: '100%' }}
+    />
+  );
 }
 ```
 
-### Host Implementation (JavaScript)
+### Emscripten Glue Code Layer
 
-```js
-// Browser-side implementation of WASI-GFX interfaces
-import { WasiGraphicsContext } from '@bytecodealliance/preview2-shim/graphics';
-import { WasiSurface } from '@bytecodealliance/preview2-shim/surface';
-import { WasiWebGPU } from '@bytecodealliance/preview2-shim/webgpu';
-
-async function setupGraphicsComponent() {
-  // Get the canvas element
-  const canvas = document.getElementById('wasm-canvas');
+```javascript
+// Generated by Emscripten - simplified version
+var Module = {
+  // Memory management
+  HEAP8: null,
+  HEAP16: null,
+  HEAP32: null,
+  HEAPF32: null,
+  HEAPF64: null,
   
-  // Set up the WASI-GFX implementations
-  const surface = new WasiSurface(canvas);
-  const webgpu = new WasiWebGPU();
-  const graphicsContext = new WasiGraphicsContext(canvas);
+  // Function exports from C++
+  _figma_engine_create: null,
+  _figma_engine_load_document: null,
+  _figma_engine_handle_mouse_down: null,
+  _figma_engine_render_frame: null,
   
-  // Load and instantiate the WebAssembly component
-  const response = await fetch('triangle_renderer.wasm');
-  const wasmModule = await WebAssembly.compileStreaming(response);
-  
-  // Connect the component to our host-provided implementations
-  const instance = await WasiComponent.instantiate(wasmModule, {
-    'wasi:webgpu/webgpu': webgpu,
-    'wasi:graphics-context/graphics-context': graphicsContext,
-    'wasi:surface/surface': surface
-  });
-  
-  // Initialize the renderer
-  instance.exports.init();
-  
-  // Set up animation loop
-  function animate() {
-    const continueAnimation = instance.exports.render();
-    if (continueAnimation) {
-      requestAnimationFrame(animate);
+  // JavaScript functions called from C++
+  js_selection_changed: function(nodeIdsPtr, count) {
+    const nodeIds = [];
+    for (let i = 0; i < count; i++) {
+      nodeIds.push(Module.HEAP32[(nodeIdsPtr >> 2) + i]);
     }
+    
+    // Bridge to React
+    if (window.figmaCanvasInstance) {
+      window.figmaCanvasInstance.onSelectionChange(nodeIds);
+    }
+  },
+  
+  js_request_animation_frame: function() {
+    requestAnimationFrame(() => {
+      Module._figma_engine_render_frame();
+    });
+  },
+  
+  js_console_log: function(messagePtr) {
+    const message = UTF8ToString(messagePtr);
+    console.log('[Figma Engine]', message);
+  }
+};
+
+// High-level JavaScript API that React uses
+class FigmaEngine {
+  constructor(moduleInstance) {
+    this.module = moduleInstance;
+    this.enginePtr = null;
   }
   
-  // Start animation
-  animate();
+  static async create(options) {
+    // Load the WebAssembly module
+    const module = await createModule();
+    const engine = new FigmaEngine(module);
+    
+    // Initialize the C++ engine
+    engine.enginePtr = module._figma_engine_create(
+      options.canvas.width,
+      options.canvas.height
+    );
+    
+    return engine;
+  }
+  
+  loadDocument(documentId) {
+    const documentIdPtr = this.module.stringToNewUTF8(documentId);
+    this.module._figma_engine_load_document(this.enginePtr, documentIdPtr);
+    this.module._free(documentIdPtr);
+  }
+  
+  handleMouseDown(x, y, button) {
+    this.module._figma_engine_handle_mouse_down(this.enginePtr, x, y, button);
+  }
 }
-
-// Run the setup when the page loads
-window.addEventListener('load', setupGraphicsComponent);
 ```
 
-### Guest Implementation (Rust)
+### C++ Engine Core
 
-```rust
-use wasi::webgpu::webgpu;
-use wasi::graphics_context::graphics_context;
-use wasi::surface::surface;
-
-// Shared state for our renderer
-struct TriangleRenderer {
-    device: webgpu::GpuDevice,
-    pipeline: webgpu::GpuRenderPipeline,
-    context: graphics_context::Context,
-}
-
-static mut RENDERER: Option<TriangleRenderer> = None;
-
-// Initialize WebGPU and create pipeline
-fn create_render_pipeline(device: &webgpu::GpuDevice) -> webgpu::GpuRenderPipeline {
-    // Vertex shader to draw a triangle
-    let shader_module = device.create_shader_module(&webgpu::GpuShaderModuleDescriptor {
-        code: r#"
-            @vertex
-            fn vs_main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4<f32> {
-                var positions = array<vec2<f32>, 3>(
-                    vec2<f32>(0.0, 0.5),
-                    vec2<f32>(-0.5, -0.5),
-                    vec2<f32>(0.5, -0.5)
-                );
-                return vec4<f32>(positions[vertex_index], 0.0, 1.0);
+```cpp
+// Simplified C++ engine core
+class FigmaEngine {
+private:
+    std::unique_ptr<SceneGraph> scene_graph_;
+    std::unique_ptr<Renderer> renderer_;
+    std::vector<NodeId> selected_nodes_;
+    
+public:
+    FigmaEngine(int canvas_width, int canvas_height) {
+        renderer_ = std::make_unique<Renderer>(canvas_width, canvas_height);
+        scene_graph_ = std::make_unique<SceneGraph>();
+    }
+    
+    void load_document(const std::string& document_id) {
+        // Load document data (possibly from IndexedDB via JS calls)
+        auto document_data = load_document_data(document_id);
+        scene_graph_->load_from_data(document_data);
+        
+        // Trigger re-render
+        request_animation_frame();
+    }
+    
+    void handle_mouse_down(float x, float y, int button) {
+        // Hit testing
+        auto hit_node = scene_graph_->hit_test(x, y);
+        
+        if (hit_node) {
+            selected_nodes_ = {hit_node->id()};
+            
+            // Call back to JavaScript
+            std::vector<uint32_t> node_ids;
+            for (const auto& node : selected_nodes_) {
+                node_ids.push_back(node.value);
             }
+            
+            // This calls the JavaScript function
+            js_selection_changed(node_ids.data(), node_ids.size());
+        }
+    }
+    
+    void render_frame() {
+        renderer_->clear();
+        scene_graph_->render(*renderer_);
+        renderer_->present();
+        
+        // Schedule next frame
+        request_animation_frame();
+    }
+};
 
-            @fragment
-            fn fs_main() -> @location(0) vec4<f32> {
-                return vec4<f32>(1.0, 0.0, 0.0, 1.0); // Red triangle
-            }
-        "#,
-    });
-
-    // Create the render pipeline
-    device.create_render_pipeline(&webgpu::GpuRenderPipelineDescriptor {
-        layout: device.create_pipeline_layout(&webgpu::GpuPipelineLayoutDescriptor {
-            bind_group_layouts: &[],
-        }),
-        vertex: webgpu::GpuVertexState {
-            module: shader_module,
-            entry_point: "vs_main",
-            buffers: &[],
-        },
-        fragment: Some(webgpu::GpuFragmentState {
-            module: shader_module,
-            entry_point: "fs_main",
-            targets: &[webgpu::GpuColorTargetState {
-                format: webgpu::GpuTextureFormat::RGBA8Unorm,
-                blend: None,
-                write_mask: webgpu::GpuColorWriteFlags::ALL,
-            }],
-        }),
-        primitive: webgpu::GpuPrimitiveState {
-            topology: webgpu::GpuPrimitiveTopology::TriangleList,
-            strip_index_format: None,
-            front_face: webgpu::GpuFrontFace::CCW,
-            cull_mode: None,
-        },
-        depth_stencil: None,
-        multisample: webgpu::GpuMultisampleState {
-            count: 1,
-            mask: !0,
-            alpha_to_coverage_enabled: false,
-        },
-    })
-}
-
-// Implement the exported functions
-#[export_name = "init"]
-pub fn init() {
-    // Get access to the GPU
-    let gpu = webgpu::get_gpu();
-    let adapter = gpu.request_adapter();
-    let device = adapter.request_device();
+// Emscripten bindings
+extern "C" {
+    EMSCRIPTEN_KEEPALIVE
+    FigmaEngine* figma_engine_create(int width, int height) {
+        return new FigmaEngine(width, height);
+    }
     
-    // Create a graphics context
-    let context = graphics_context::Context::new();
+    EMSCRIPTEN_KEEPALIVE
+    void figma_engine_load_document(FigmaEngine* engine, const char* document_id) {
+        engine->load_document(std::string(document_id));
+    }
     
-    // Connect the device to the graphics context
-    device.connect_graphics_context(&context);
+    EMSCRIPTEN_KEEPALIVE
+    void figma_engine_handle_mouse_down(FigmaEngine* engine, float x, float y, int button) {
+        engine->handle_mouse_down(x, y, button);
+    }
     
-    // Create the render pipeline
-    let pipeline = create_render_pipeline(&device);
-    
-    // Store the renderer for later use
-    unsafe {
-        RENDERER = Some(TriangleRenderer {
-            device,
-            pipeline,
-            context,
-        });
+    EMSCRIPTEN_KEEPALIVE
+    void figma_engine_render_frame(FigmaEngine* engine) {
+        engine->render_frame();
     }
 }
 
-#[export_name = "render"]
-pub fn render() -> bool {
-    let renderer = unsafe { RENDERER.as_ref().unwrap() };
-    
-    // Get the next frame buffer from the graphics context
-    let buffer = renderer.context.get_current_buffer();
-    
-    // Convert the abstract buffer to a WebGPU texture
-    let texture = webgpu::GpuTexture::from_graphics_buffer(&buffer);
-    let texture_view = texture.create_view();
-    
-    // Create a command encoder
-    let encoder = renderer.device.create_command_encoder();
-    
-    // Begin a render pass
-    let render_pass = encoder.begin_render_pass(&webgpu::GpuRenderPassDescriptor {
-        color_attachments: &[webgpu::GpuRenderPassColorAttachment {
-            view: texture_view,
-            resolve_target: None,
-            load_op: webgpu::GpuLoadOp::Clear,
-            store_op: webgpu::GpuStoreOp::Store,
-            clear_value: webgpu::GpuColor {
-                r: 0.1,
-                g: 0.2,
-                b: 0.3,
-                a: 1.0,
-            },
-        }],
-        depth_stencil_attachment: None,
-    });
-    
-    // Set the pipeline and draw the triangle
-    render_pass.set_pipeline(&renderer.pipeline);
-    render_pass.draw(3, 1, 0, 0);
-    render_pass.end();
-    
-    // Submit the commands
-    let command_buffer = encoder.finish();
-    renderer.device.queue().submit(&[command_buffer]);
-    
-    // Present the frame
-    renderer.context.present();
-    
-    // Continue animation
-    true
+// JavaScript interface functions (called from C++)
+extern "C" {
+    void js_selection_changed(uint32_t* node_ids, int count);
+    void js_request_animation_frame();
+    void js_console_log(const char* message);
 }
 ```
 
-This example demonstrates how WASI-GFX enables high-performance graphics applications using WebAssembly. The host (browser) provides implementations of the graphics interfaces, while the guest (Rust WebAssembly module) can use these interfaces to render graphics content without needing to know the underlying platform details.
+### Challenges with the Traditional Approach
+
+1. **Manual Glue Code**: Extensive JavaScript glue code needed to bridge types and calling conventions
+2. **Memory Management**: Manual management of WebAssembly memory for passing complex data
+3. **Type Safety**: No compile-time guarantees about interface contracts
+4. **Debugging Complexity**: Difficult to debug across the JavaScript/WebAssembly boundary
+5. **Bundle Size**: Emscripten generates significant overhead code
+
+### How WIT Component Model Improves This
+
+The WIT approach we documented above addresses these issues:
+
+```wit
+// Instead of manual glue code, define clean interfaces
+world figma-engine {
+    // Host (React) provides these to guest (C++ engine)
+    import canvas-api;
+    import document-storage;
+    import animation-frame;
+    
+    // Guest (C++ engine) provides these to host (React)  
+    export rendering-engine;
+    export selection-manager;
+    export viewport-controller;
+}
+
+interface rendering-engine {
+    load-document: func(document-id: string);
+    render-frame: func();
+    handle-input: func(event: input-event);
+}
+
+interface selection-manager {
+    get-selection: func() -> list<node-id>;
+    set-selection: func(nodes: list<node-id>);
+}
+```
+
+**Benefits of WIT approach:**
+- **Type Safety**: Interfaces are statically defined and checked
+- **No Manual Glue Code**: Bindings are generated automatically
+- **Language Agnostic**: Same interface works with Rust, C++, Go, etc.
+- **Smaller Bundle Size**: No Emscripten runtime overhead
+- **Better Debugging**: Clear interface boundaries with proper error handling
+- **Composability**: Engines can be mixed and matched across different hosts
+
+The WIT Component Model represents the evolution from manual, error-prone integration patterns toward a more robust, type-safe, and maintainable approach to WebAssembly integration.
+
+# WebAssembly Interface Types (WIT) and the Host-Guest Model
+
+## What are WIT Worlds?
+
+A **WIT World** is a contract that defines the complete interface of a WebAssembly component. It specifies what functionality the component needs from its environment (imports) and what functionality it provides to its environment (exports). Think of it as an API specification that works across different programming languages and runtime environments.
+
+## Host vs Guest: Who Does What?
+
+In the WebAssembly Component Model:
+
+- **Host**: The runtime environment that loads and executes WebAssembly components (e.g., browser, Node.js, or a WASI runtime)
+- **Guest**: The WebAssembly component itself (e.g., your Rust code compiled to WebAssembly)
+
+```mermaid
+graph TB
+    subgraph "Host Environment"
+        H["Host Runtime<br/>(Browser, Node.js, etc.)"]
+        H1["Host-Provided APIs<br/>(File system, DOM, WebGPU)"]
+    end
+    
+    subgraph "Guest Component"
+        G["WebAssembly Module<br/>(Your Rust/C++/etc. code)"]
+        G1["Guest-Implemented APIs<br/>(Business logic, algorithms)"]
+    end
+    
+    H -- "Provides implementations for" --> G
+    G -- "Calls functions from" --> H1
+    G -- "Provides implementations for" --> H
+    H -- "Calls functions from" --> G1
+    
+    classDef host fill:#ffebee,stroke:#d32f2f
+    classDef guest fill:#e8f5e8,stroke:#388e3c
+    
+    class H,H1 host
+    class G,G1 guest
+```
+
+## Understanding Imports and Exports
+
+### Imports: What the Guest Needs from the Host
+When a WebAssembly component **imports** an interface, it means:
+- The **guest** (WebAssembly component) declares it needs certain functionality
+- The **host** (runtime environment) must provide implementations of those functions
+- The **guest** calls these functions during execution
+
+### Exports: What the Guest Provides to the Host
+When a WebAssembly component **exports** an interface, it means:
+- The **guest** (WebAssembly component) implements and provides certain functionality
+- The **host** (runtime environment) can call these functions
+- The **guest** must provide the actual implementation
+
+## Example: Browser Interaction World
+
+Let's imagine a `browser.wit` that defines how a WebAssembly component interacts with browser APIs:
+
+```wit
+// browser.wit - A conceptual example
+package browser:api@1.0.0;
+
+world browser-app {
+    // IMPORTS: Host (browser) provides these to Guest (WebAssembly)
+    import dom-manipulation;     // Browser implements DOM APIs
+    import fetch-api;           // Browser implements HTTP requests  
+    import local-storage;       // Browser implements storage APIs
+    import console-logging;     // Browser implements console.log, etc.
+    
+    // EXPORTS: Guest (WebAssembly) provides these to Host (browser)  
+    export app-lifecycle;       // WebAssembly implements app startup/shutdown
+    export event-handlers;      // WebAssembly implements click handlers, etc.
+    export data-processing;     // WebAssembly implements business logic
+}
+
+// Host-provided interfaces (browser implements these)
+interface dom-manipulation {
+    create-element: func(tag: string) -> element-id;
+    set-text-content: func(element: element-id, text: string);
+    append-child: func(parent: element-id, child: element-id);
+    query-selector: func(selector: string) -> option<element-id>;
+}
+
+interface fetch-api {
+    request: func(url: string, options: request-options) -> result<response, fetch-error>;
+}
+
+interface console-logging {
+    log: func(message: string);
+    error: func(message: string);
+}
+
+// Guest-provided interfaces (WebAssembly implements these)
+interface app-lifecycle {
+    init: func();
+    cleanup: func();
+}
+
+interface event-handlers {
+    handle-click: func(element: element-id, x: f32, y: f32);
+    handle-input: func(element: element-id, value: string);
+}
+
+interface data-processing {
+    process-user-data: func(data: list<u8>) -> result<processed-data, processing-error>;
+    validate-form: func(form-data: form-inputs) -> validation-result;
+}
+```
+
+### Host Implementation (JavaScript in Browser)
+
+```javascript
+// Browser (host) provides implementations for imported interfaces
+const domAPI = {
+    createElement: (tag) => {
+        const element = document.createElement(tag);
+        const id = generateElementId();
+        elementRegistry.set(id, element);
+        return id;
+    },
+    setTextContent: (elementId, text) => {
+        const element = elementRegistry.get(elementId);
+        element.textContent = text;
+    },
+    // ... other DOM methods
+};
+
+const fetchAPI = {
+    request: async (url, options) => {
+        try {
+            const response = await fetch(url, options);
+            return { ok: response, err: null };
+        } catch (error) {
+            return { ok: null, err: error };
+        }
+    }
+};
+
+// Load and instantiate the WebAssembly component
+const wasmModule = await WebAssembly.instantiateStreaming(
+    fetch('app.wasm'),
+    {
+        'browser:api/dom-manipulation': domAPI,
+        'browser:api/fetch-api': fetchAPI,
+        'browser:api/console-logging': console,
+        // ... other host-provided implementations
+    }
+);
+
+// Host calls guest-exported functions
+wasmModule.instance.exports.init();
+
+// Set up event listeners that call into WebAssembly
+document.addEventListener('click', (event) => {
+    const elementId = getElementId(event.target);
+    wasmModule.instance.exports.handleClick(elementId, event.x, event.y);
+});
+```
+
+### Guest Implementation (Rust WebAssembly)
+
+```rust
+// Import interfaces provided by the host (browser)
+use browser::api::{dom_manipulation, fetch_api, console_logging};
+
+// Implement interfaces exported to the host
+wit_bindgen::generate!({
+    path: "wit",
+    world: "browser-app",
+});
+
+struct BrowserApp;
+
+// Implement exported interfaces
+impl Guest for BrowserApp {
+    fn init() {
+        console_logging::log("WebAssembly app initializing");
+        
+        // Use host-provided DOM API
+        let container = dom_manipulation::query_selector("#app-container").unwrap();
+        let title = dom_manipulation::create_element("h1");
+        dom_manipulation::set_text_content(title, "Hello from WebAssembly!");
+        dom_manipulation::append_child(container, title);
+    }
+    
+    fn handle_click(element_id: ElementId, x: f32, y: f32) {
+        console_logging::log(&format!("Clicked at ({}, {})", x, y));
+        
+        // Process the click using host-provided APIs
+        let button = dom_manipulation::create_element("button");
+        dom_manipulation::set_text_content(button, "Clicked!");
+        // ... more processing
+    }
+    
+    fn process_user_data(data: Vec<u8>) -> Result<ProcessedData, ProcessingError> {
+        // Complex data processing that benefits from WebAssembly's speed
+        let processed = expensive_algorithm(data);
+        Ok(processed)
+    }
+}
+```
+
+## Real Examples from This Codebase
+
+### 1. Markdown Parser - Guest Exports to Host
+
+From `crates/wasi-markdown/wit/world.wit`:
+
+```wit
+world markdown {
+    // Guest exports parsing functionality to host
+    export parser;  
+}
+
+interface parser {
+    // Host can call these functions implemented by the guest
+    parse-markdown: func(input: string) -> string;
+    parse-markdown-with-config: func(
+        input: string,
+        enable-syntax-highlighting: bool,
+        enable-math: bool
+    ) -> string;
+}
+```
+
+**Flow**: Host (JavaScript) → calls → Guest (Rust WebAssembly)
+- JavaScript provides markdown text
+- Rust processes it and returns HTML
+- JavaScript displays the result
+
+### 2. Graphics Triangle - Guest Imports from Host
+
+From `crates/wasi-basic-triangle/wit/example.wit`:
+
+```wit
+world example {
+    // Guest imports graphics capabilities from host
+    import wasi:webgpu/webgpu@0.0.1;
+    import wasi:graphics-context/graphics-context@0.0.1;
+    import wasi:surface/surface@0.0.1;
+}
+```
+
+**Flow**: Guest (Rust WebAssembly) → calls → Host (Browser WebGPU APIs)
+- Rust requests GPU device and resources
+- Browser provides WebGPU implementations
+- Rust renders graphics using host-provided APIs
+
+### 3. TSX Processing Pipeline - Guest Exports Processing
+
+From `crates/wasi-etch-tsx/wit/world.wit`:
+
+```wit
+world etch-tsx {
+    export pipeline;
+}
+
+interface pipeline {
+    resource tsx-pipeline {
+        constructor(input: string);
+        run: func() -> result<string, tsx-error>;
+    }
+}
+```
+
+**Flow**: Host (JavaScript) → calls → Guest (Rust WebAssembly)
+- JavaScript provides TSX source code
+- Rust processes and transforms it
+- JavaScript receives transformed output
+
+## Key Benefits of This Model
+
+1. **Language Interoperability**: Write performance-critical code in Rust/C++ while keeping UI logic in JavaScript
+2. **Security**: WebAssembly components run in a sandboxed environment with explicit capabilities
+3. **Modularity**: Components can be composed and reused across different host environments
+4. **Performance**: Leverage native-speed execution for computationally intensive tasks
+5. **Platform Portability**: Same WebAssembly component can run in browsers, servers, and edge environments
+
+## The Two-Way Contract
+
+```mermaid
+flowchart LR
+    subgraph "Host Responsibilities"
+        H1["Implement imported interfaces"]
+        H2["Call exported functions"]
+        H3["Manage component lifecycle"]
+    end
+    
+    subgraph "Guest Responsibilities"  
+        G1["Implement exported interfaces"]
+        G2["Use imported functions"]
+        G3["Define interface contracts via WIT"]
+    end
+    
+    H1 -.-> G2
+    G1 -.-> H2
+    
+    classDef host fill:#ffebee,stroke:#d32f2f
+    classDef guest fill:#e8f5e8,stroke:#388e3c
+    
+    class H1,H2,H3 host
+    class G1,G2,G3 guest
+```
+
+This model creates a powerful ecosystem where hosts and guests can provide complementary capabilities to each other, enabling new architectures that combine the best of different technologies and runtime environments.

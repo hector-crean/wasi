@@ -1,25 +1,34 @@
 // Define the package and version (optional but good practice)
 package wasi:markdown-parser@0.1.0;
 
-
-
-
 // Define the world for our component
 // A world describes the imports and exports of a WebAssembly component.
+// In the WebAssembly component model:
+// - The "guest" is the WebAssembly component being defined here (markdown parser)
+// - The "host" is the runtime environment that will load and run this component
+
 world markdown {
-    // Export the 'parse-markdown' interface
+    // Export the 'parser' interface from the guest component to the host
+    // This means the guest (WebAssembly component) implements these functions
+    // and the host (runtime environment) can call them
     export parser;  
 }
 
-
+// Interface definition for the parser functionality
+// These functions will be implemented by the guest (WebAssembly component)
+// and can be called by the host (runtime environment)
 interface parser {
     // Basic markdown parsing function
+    // The guest receives a string from the host and returns a processed string
     parse-markdown: func(input: string) -> string;
     
     // Advanced parsing with configuration options
+    // The guest receives a string and configuration parameters from the host
+    // and returns a processed string
     parse-markdown-with-config: func(
         input: string,
         enable-syntax-highlighting: bool,
         enable-math: bool
     ) -> string;
 }
+

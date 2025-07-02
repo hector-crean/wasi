@@ -1,0 +1,28 @@
+// Define the package and version (optional but good practice)
+package wasi:etch-tsx@0.1.0;
+
+interface pipeline {
+  // Define error type if needed
+  enum tsx-error {
+    parse-error,
+    io-error,
+    from-utf8-error,
+    raw-html-error,
+    // Add other error variants as needed
+  }
+
+  // Define the TsxPipeline resource
+  resource tsx-pipeline {
+    // Constructor
+    constructor(input: string);
+    
+    // Methods
+    run: func() -> result<string, tsx-error>;
+    
+    // Add other methods as needed
+  }
+}
+
+world etch-tsx {
+  export pipeline;
+}

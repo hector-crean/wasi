@@ -1,0 +1,25 @@
+[package]
+name = "wasi-etch-tsx"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+etch_tsx = { path = "../../../etch/crates/etch_tsx" }
+thiserror = "1.0.64"
+wit-bindgen = { workspace = true }
+
+
+# [patch.crates-io]
+# uuid = { version = "1.16.0", features = ["v4", "serde", "rng"] }
+
+
+[profile.release]
+lto = true
+opt-level = 's' # Optimize for size
