@@ -1,6 +1,6 @@
 # WIT: The future for React - Rust interop?
 
-I've been creating a 'figma-esque' application, which combines a rust game engine and a nextjs react app. We compile the rust code to wasm using wasm-bindgen, and call it from the javascript side. The rust code controls the canvas, and the rest of the UI is done with react. It works, but current state of WebAssembly integration requires extensive JavaScript glue code to bridge the gap between web applications and WebAssembly modules, as illustrated below:
+I've been creating a 'figma-esque' application, which combines a rust game engine, [bevy](https://bevy.org/), and a nextjs react app. We compile the rust code to wasm using [wasm-bindgen](https://github.com/rustwasm/wasm-bindgen), and call it from the javascript side. The rust code controls the canvas, and the rest of the UI is done with react. It works, but current state of WebAssembly integration requires extensive JavaScript glue code to bridge the gap between web applications and WebAssembly modules. Wasm-bindgen does autogenerate much of this for us, and even provides typings, but it's somewhat messy.  
 
 ![glue-code](/assets/js-glue-code.webp)
 
@@ -539,6 +539,78 @@ impl Guest for BrowserApp {
         Ok(processed)
     }
 }
+```
+
+
+## Applying to our Rust - React application
+
+```wit
+package witty:app;
+interface renderable { 
+    resource bevy-app {
+        constructor();
+        tick: func() -> result<_, string>;
+    }
+}
+
+world app {
+    export renderable;
+}
+```
+
+```rs
+use wit_bindgen::generate;
+use std::cell::{RefCell, Cell};
+use bevy::prelude::*;
+generate!({
+    world: "app",
+    path: "wit",
+});
+
+use exports::witty::app::renderable::{Guest, GuestBevyApp};
+
+pub struct MyApp;
+
+impl Guest for MyApp {
+    type BevyApp = MyBevyApp;
+}
+
+
+
+pub struct MyBevyApp {
+    app: Option<RefCell<App>>,
+
+}
+
+impl GuestBevyApp for MyBevyApp {
+    fn new() -> Self {
+        let mut app = App::new();
+        // app.add_plugins(DefaultPlugins);
+        MyBevyApp { app: Some(RefCell::new(app)) }
+
+    }
+    fn tick(&self) -> Result<(), String> {
+
+        if let Some(app_cell) = &self.app {
+            match app_cell.try_borrow_mut() {
+                Ok(mut bevy_app_instance) => {
+                    bevy_app_instance.update(); // Call Bevy's update          
+                    Ok(())
+                }
+                Err(e) => {
+                    // Handle the case where it's already borrowed mutably,
+                    // which shouldn't happen in a simple tick from JS.
+                    Err(format!("Failed to borrow Bevy app mutably: {}", e))
+                }
+            }
+        } else {
+            Err("Bevy app is not initialized.".to_string())
+        }
+    }
+}
+
+export!(MyApp);
+
 ```
 
 ## Real Examples from This Codebase
