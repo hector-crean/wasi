@@ -1,10 +1,12 @@
-# Current Situation
+# WIT: The future for React - Rust interop?
 
-The current state of WebAssembly integration often requires extensive JavaScript glue code to bridge the gap between web applications and WebAssembly modules, as illustrated below:
+I've been creating a 'figma-esque' application, which combines a rust game engine and a nextjs react app. We compile the rust code to wasm using wasm-bindgen, and call it from the javascript side. The rust code controls the canvas, and the rest of the UI is done with react. It works, but current state of WebAssembly integration requires extensive JavaScript glue code to bridge the gap between web applications and WebAssembly modules, as illustrated below:
 
 ![glue-code](/assets/js-glue-code.webp)
 
 ## The Traditional Approach: Figma's Emscripten Integration
+
+![figma](https://cdn.sanity.io/images/599r6htc/regionalized/35d881e9c91c4f2d6756271f984143f2d2ba8636-3200x1864.png?w=1080&q=75&fit=max&auto=format&dpr=2)
 
 [Figma](https://www.figma.com/blog/how-figma-draws-inspiration-from-the-gaming-world/) provides an excellent example of how traditional WebAssembly integration works using Emscripten to wrap a C++ rendering engine in a React application. This approach represents the "current situation" that the WIT Component Model aims to improve upon.
 
